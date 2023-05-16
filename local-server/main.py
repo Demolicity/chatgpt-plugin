@@ -1,8 +1,12 @@
-# This is a version of the main.py file found in ../../../server/main.py for testing the plugin locally.
-# Use the command `poetry run dev` to run this.
+# This is a version of the main.py file found in ../../server/main.py that also gives ChatGPT access to the upsert endpoint
+# (allowing it to save information from the chat back to the vector) database.
+# Copy and paste this into the main file at ../../server/main.py if you choose to give the model access to the upsert endpoint
+# and want to access the openapi.json when you run the app locally at http://0.0.0.0:8000/sub/openapi.json.
+import os
 from typing import Optional
 import uvicorn
-from fastapi import FastAPI, File, Form, HTTPException, Body, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Depends, Body, UploadFile
+from fastapi.staticfiles import StaticFiles
 
 from models.api import (
     DeleteRequest,
@@ -15,46 +19,19 @@ from models.api import (
 from datastore.factory import get_datastore
 from services.file import get_document_from_file
 
-from starlette.responses import FileResponse
-
 from models.models import DocumentMetadata, Source
-from fastapi.middleware.cors import CORSMiddleware
-
 
 app = FastAPI()
+app.mount("/.well-known", StaticFiles(directory=".well-known"), name="static")
 
-PORT = 3333
-
-origins = [
-    f"http://localhost:{PORT}",
-    "https://chat.openai.com",
-]
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+# Create a sub-application, in order to access just the upsert and query endpoints in the OpenAPI schema, found at http://0.0.0.0:8000/sub/openapi.json when the app is running locally
+sub_app = FastAPI(
+    title="Retrieval Plugin API",
+    description="A retrieval API for querying and filtering documents based on natural language queries and metadata",
+    version="1.0.0",
+    servers=[{"url": "https://ac8cc8efec99.ngrok.app"}],
 )
-
-
-@app.route("/.well-known/ai-plugin.json")
-async def get_manifest(request):
-    file_path = "./local-server/ai-plugin.json"
-    return FileResponse(file_path, media_type="text/json")
-
-
-@app.route("/.well-known/logo.png")
-async def get_logo(request):
-    file_path = "./local-server/logo.png"
-    return FileResponse(file_path, media_type="text/json")
-
-
-@app.route("/.well-known/openapi.yaml")
-async def get_openapi(request):
-    file_path = "./local-server/openapi.yaml"
-    return FileResponse(file_path, media_type="text/json")
+app.mount("/sub", sub_app)
 
 
 @app.post(
@@ -88,6 +65,22 @@ async def upsert_file(
     "/upsert",
     response_model=UpsertResponse,
 )
+async def upsert_main(
+    request: UpsertRequest = Body(...),
+):
+    try:
+        ids = await datastore.upsert(request.documents)
+        return UpsertResponse(ids=ids)
+    except Exception as e:
+        print("Error:", e)
+        raise HTTPException(status_code=500, detail="Internal Service Error")
+
+
+@sub_app.post(
+    "/upsert",
+    response_model=UpsertResponse,
+    description="Save chat information. Accepts an array of documents with text (potential questions + conversation text), metadata (source 'chat' and timestamp, no ID as this will be generated). Confirm with the user before saving, ask for more details/context.",
+)
 async def upsert(
     request: UpsertRequest = Body(...),
 ):
@@ -99,8 +92,31 @@ async def upsert(
         raise HTTPException(status_code=500, detail="Internal Service Error")
 
 
-@app.post("/query", response_model=QueryResponse)
-async def query_main(request: QueryRequest = Body(...)):
+@app.post(
+    "/query",
+    response_model=QueryResponse,
+)
+async def query_main(
+    request: QueryRequest = Body(...),
+):
+    try:
+        results = await datastore.query(
+            request.queries,
+        )
+        return QueryResponse(results=results)
+    except Exception as e:
+        print("Error:", e)
+        raise HTTPException(status_code=500, detail="Internal Service Error")
+
+
+@sub_app.post(
+    "/query",
+    response_model=QueryResponse,
+    description="Accepts search query objects array each with query and optional filter. Break down complex questions into sub-questions. Refine results by criteria, e.g. time / source, don't do this often. Split queries if ResponseTooLargeError occurs.",
+)
+async def query(
+    request: QueryRequest = Body(...),
+):
     try:
         results = await datastore.query(
             request.queries,
@@ -142,4 +158,4 @@ async def startup():
 
 
 def start():
-    uvicorn.run("local-server.main:app", host="localhost", port=PORT, reload=True)
+    uvicorn.run("server.main:app", host="0.0.0.0", port=8000, reload=True)
