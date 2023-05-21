@@ -1,8 +1,8 @@
 {
   "schema_version": "v1",
   "name_for_model": "retrieval",
-  "name_for_human": "Retrieval Plugin",
-  "description_for_model": "Plugin for searching through the user's documents and allowing ChatGPT to remember important information to Avoid context limitaions. Search things (such as files, pdf, datasets, and more) to find answers to questions and retrieve relevant information. Use it whenever a user asks something that might be found in their personal information, or asks you to save information for later.",
+  "name_for_human": "MemoryRP",
+  "description_for_model": "Plugin for searching through the user's documents and allowing ChatGPT to remember previous chat information to Avoid context limitaions. Search things (such as files, previous chats, datasets, and more) to find answers to questions and retrieve relevant information. Use it whenever a user asks something that might be found in their personal information, past chats, or asks you to save information for later.",
   "description_for_human": "Query, Upsert, Embedding .",
   "auth": {
     "type": "none"
@@ -10,7 +10,7 @@
   },
   "api": {
     "type": "openapi",
-    "url": "https://ac8cc8efec99.ngrok.app/.well-known/openapi.yaml"
+    "url": "https://demo.ngrok.app/.well-known/openapi.yaml"
   },
   "logo_url": "https://your-app-url.com/.well-known/logo.png",
   "contact_email": "hello@contact.com", 

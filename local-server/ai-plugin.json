@@ -9,7 +9,7 @@
   },
   "api": {
     "type": "openapi",
-    "url": "https://ac8cc8efec99.ngrok.app"
+    "url": "https://demo.ngrok.app"
   },
   "logo_url": "https://ac8cc8efec99.ngrok.app",
   "contact_email": "hello@contact.com", 
